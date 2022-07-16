@@ -1,1 +1,17 @@
-
+（此部分与组员共同讨论完成）
+ls
+cd moocos/
+cd ucore_lab/
+cd labcodes_answer/
+make
+make V=
+less Makedile
+/lab1-mon
+tools/lab1init
+less  tools/lab1init
+make lab1-mon
+x /10i $pc
+continue
+make debug
+x/i 0xffff0
+b* 0x7c00
