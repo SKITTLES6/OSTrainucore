@@ -1,0 +1,81 @@
+练习1：
+pte_t *ptep=NULL;
+// try to find a pte, if pte's PT(Page Table) isn't existed, then create a PT.
+// (notice the 3th parameter '1')
+if ((ptep = get_pte(mm->pgdir, addr, 1)) == NULL) {
+    cprintf("get_pte in do_pgfault failed\n");
+    goto failed;
+}
+
+
+if (*ptep == 0) {
+        if (page = pgdir_alloc_page(mm->pgdir, addr, perm)) {
+            ret = 0;
+        }
+    }
+    else if (swap_init_ok) {
+        swap_in(mm, addr, &page);
+
+        if (0 == page_insert(mm->pgdir, page, addr, perm)) {
+            swap_map_swappable(mm, addr, page, 0);
+            ret = 0;
+        }
+    }
+    
+    
+    if (*ptep == 0) { // if the phy addr isn't exist, then alloc a page & map the phy addr with logical addr
+        if (pgdir_alloc_page(mm->pgdir, addr, perm) == NULL) {
+            cprintf("pgdir_alloc_page in do_pgfault failed\n");
+            goto failed;
+        }
+    }
+    else { // if this pte is a swap entry, then load data from disk to a page with phy addr
+           // and call page_insert to map the phy addr with logical addr
+        if(swap_init_ok) {
+            struct Page *page=NULL;
+            if ((ret = swap_in(mm, addr, &page)) != 0) {
+                cprintf("swap_in in do_pgfault failed\n");
+                goto failed;
+            }    
+            page_insert(mm->pgdir, page, addr, perm);
+            swap_map_swappable(mm, addr, page, 1);
+            page->pra_vaddr = addr;
+        }
+        else {
+            cprintf("no swap_init_ok but ptep is %x, failed\n",*ptep);
+            goto failed;
+        }
+    }
+    
+    练习2：
+    ptep = get_pte(mm->pgdir, addr, 1); // 获取当前发生缺页的虚拟页对应的PTE
+if (*ptep == 0) { // 如果需要的物理页是没有分配而不是被换出到外存中
+    struct Page* page = pgdir_alloc_page(mm->pgdir, addr, perm); // 分配物理页，并且与对应的虚拟页建立映射关系
+} else {
+        if (swap_init_ok) { // 判断是否当前交换机制正确被初始化
+            struct Page *page = NULL;
+            swap_in(mm, addr, &page); // 将物理页换入到内存中
+            page_insert(mm->pgdir, page, addr, perm); // 将物理页与虚拟页建立映射关系
+            swap_map_swappable(mm, addr, page, 1); // 设置当前的物理页为可交换的
+            page->pra_vaddr = addr; // 同时在物理页中维护其对应到的虚拟页的信息，这个语句本人觉得最好应当放置在page_insert函数中进行维护，在该建立映射关系的函数外对物理page对应的虚拟地址进行维护显得有些不太合适
+        } else {
+            cprintf("no swap_init_ok but ptep is %x, failed\n",*ptep);
+            goto failed;
+        }
+}
+
+
+list_entry_t *head=(list_entry_t*) mm->sm_priv; // 找到链表的入口
+assert(head != NULL); // 进行一系列检查
+assert(in_tick==0);
+list_entry_t *le = list_next(head); // 取出链表头，即最早进入的物理页面
+assert(le != head); // 确保链表非空
+struct Page *page = le2page(le, pra_page_link); // 找到对应的物理页面的Page结构
+list_del(le); // 从链表上删除取出的即将被换出的物理页面
+*ptr_page = page;
+
+
+list_entry_t *head=(list_entry_t*) mm->sm_priv; // 找到链表入口
+list_entry_t *entry=&(page->pra_page_link); // 找到当前物理页用于组织成链表的list_entry_t
+assert(entry != NULL && head != NULL); 
+list_add_before(head, entry); // 将当前指定的物理页插入到链表的末尾
