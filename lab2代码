@@ -1,0 +1,35 @@
+list_add_before(&free_list, &(base->page_link));
+list_add_after(&(page->page_link), &(p->page_link));
+list_add_before(le, &(base->page_link));
+pte_t * get_pte(pde_t *pgdir, uintptr_t la, bool create) 
+{
+    pde_t *pdep = &pgdir[PDX(la)];
+    if (!(*pdep & PTE_P))// 
+    {
+        struct Page *page;
+        if (!create || (page = alloc_page()) == NULL)
+            return NULL;
+        set_page_ref(page, 1);// 二级页表所对应的物理页引用数为1
+        uintptr_t pa = page2pa(page); // 获得page变量的物理地址
+        memset(KADDR(pa), 0, PGSIZE);
+        *pdep = pa | PTE_U | PTE_W | PTE_P;//或PTE_U/PTE_W/PET_P 标识当前页目录项是用户级别的、可写的、已存在的
+    }
+    return &((pte_t *)KADDR(PDE_ADDR(*pdep)))[PTX(la)];//la:线性地址/物理地址
+                                                        PDX(la):一级页目录表的下标
+                                                        *pdep:la所在的二级页表的物理地址
+                                                        PDE_ADDR(*pdep)：进行4K对齐
+                                                        KADDR()对la所在的二级页表的物理地址进行虚拟
+}
+static inline void
+page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {//用来释放页并取消映射
+    if (*ptep & PTE_P) 
+    {   // 如果对应的二级页表项存在
+        // 获得*ptep对应的Page结构
+        struct Page *page = pte2page(*ptep);
+        // 关联的page引用数自减1
+        if (page_ref_dec(page) == 0)
+            free_page(page); // 如果自减1后，引用数为0，需要free释放掉该物理页
+        *ptep = 0;// 
+        tlb_invalidate(pgdir, la);
+    }
+}
