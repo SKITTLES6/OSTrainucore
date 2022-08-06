@@ -1,0 +1,50 @@
+练习一
+// 对分配好内存的proc结构体属性进行格式化
+// 最一开始进程的状态为uninitialized
+proc->state = PROC_UNINIT;// 负数的pid是非法的，未正式初始化之前pid统一为-1
+int pid = -1;//给pid赋值
+int runs = 0;//给runs赋值
+uintptr_t kstack = 0;//给kstack赋值
+volatile bool need_resched = 0;给need_resched赋值
+struct proc_struct *parent = NULL;
+struct mm_struct *parent = NULL;// 清零格式化proc->context中的内容
+memset(&(proc->context), 0, sizeof(struct context));
+struct trapfame *tf = NULL;// 未初始化时，cr3默认指向内核页表
+uintptr_t cr3 = boot_cr3;
+uint32_t flags = 0;// 清零格式化proc->name
+memset(proc->name, 0, PROC_NAME_LEN); 
+练习三
+if (proc != current)// 只有当proc不是当前执行的线程时，才需要执行
+// 设置cr3寄存器的值，令其指向新线程的页表
+lcr3(next->cr3);
+// 分配一个未初始化的线程控制块
+if ((proc = alloc_proc()) == NULL) {
+        goto fork_out;
+    }
+    // 其父进程属于current当前进程
+    proc->parent = current;
+ // 设置，分配新线程的内核栈
+ 练习二
+    if (setup_kstack(proc) != 0) {
+    	// 分配失败，回滚释放之前所分配的内存
+        goto bad_fork_cleanup_proc;
+    }
+    // 由于是fork，因此fork的一瞬间父子线程的内存空间是一致的（clone_flags决定是否采用写时复制）
+    if (copy_mm(clone_flags, proc) != 0) {// 分配失败，回滚释放之前所分配的内存
+        goto bad_fork_cleanup_kstack;
+    }// 复制proc线程时，设置proc的上下文信息
+    copy_thread(proc, stack, tf);  
+    bool intr_flag;
+    local_intr_save(intr_flag);
+    {
+    	// 生成并设置新的pid
+        proc->pid = get_pid();
+        // 加入全局线程控制块哈希表
+        hash_proc(proc);
+        // 加入全局线程控制块双向链表
+        list_add(&proc_list, &(proc->list_link));
+        nr_process ++;
+    }
+    local_intr_restore(intr_flag);
+    // 唤醒proc，令其处于就绪态PROC_RUNNABLE
+    wakeup_proc(proc);       
